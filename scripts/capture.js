@@ -1,34 +1,26 @@
-name: Capturar pauta de audiências
+const { chromium } = require('playwright');
 
-on:
-  schedule:
-    - cron: '0,30 11-19 * * 1-5'
-  workflow_dispatch: {}
+const URL_PAUTA = 'https://pje.trt11.jus.br/consultaprocessual/pautas#VT12-1';
 
-jobs:
-  capturar:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Baixar o repositório
-        uses: actions/checkout@v4
+const CSS_AJUSTE = `
+  html { zoom: 1.1 !important; }
+  mat-card:nth-of-type(1), mat-card:nth-of-type(2) { display: none !important; }
+`;
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 
-      - name: Instalar o Playwright
-        run: |
-          npm install playwright
-          npx playwright install --with-deps chromium
+  console.log('Abrindo a página da pauta...');
+  await page.goto(URL_PAUTA, { waitUntil: 'networkidle', timeout: 60000 });
 
-      - name: Rodar a captura
-        run: node scripts/capture.js
+  await page.addStyleTag({ content: CSS_AJUSTE });
 
-      - name: Publicar a imagem atualizada
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pauta.png
-          git diff --quiet --cached || git commit -m "Atualiza captura da pauta"
-          git push
+  await page.waitForTimeout(6000);
+
+  console.log('Tirando a captura...');
+  await page.screenshot({ path: 'pauta.png', fullPage: true });
+
+  await browser.close();
+  console.log('Captura salva em pauta.png');
+})();

@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 const URL_PAUTA = 'https://pje.trt11.jus.br/consultaprocessual/pautas#VT12-1';
 
 const CSS_AJUSTE = `
-  html { zoom: 1.1 !important; }
+  html { zoom: 1.0 !important; }
   mat-card:nth-of-type(1), mat-card:nth-of-type(2) { display: none !important; }
 `;
 

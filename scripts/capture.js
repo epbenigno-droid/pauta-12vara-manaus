@@ -59,21 +59,3 @@ async function tentarCapturar(context, tentativa) {
   await browser.close();
   console.log('Captura salva em pauta.png' + (sucesso ? '' : ' (aviso: conteúdo pode estar incompleto mesmo após 2 tentativas)'));
 })();
-
-(async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-
-  let sucesso = await tentarCapturar(page, 1);
-
-  if (!sucesso) {
-    console.log('Conteúdo não detectado na primeira tentativa, tentando mais uma vez...');
-    sucesso = await tentarCapturar(page, 2);
-  }
-
-  console.log('Tirando a captura...');
-  await page.screenshot({ path: 'pauta.png', fullPage: true });
-
-  await browser.close();
-  console.log('Captura salva em pauta.png' + (sucesso ? '' : ' (aviso: conteúdo pode estar incompleto mesmo após 2 tentativas)'));
-})();

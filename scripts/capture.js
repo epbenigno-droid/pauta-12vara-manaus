@@ -2,38 +2,55 @@
 // página do JTe feita especificamente para exibição em painéis de TV
 // (com rolagem automática já embutida pelo próprio CSJT).
 // Roda automaticamente pelo GitHub Actions (veja .github/workflows/capturar-pauta.yml).
+//
+// O JTe bloqueia navegadores automatizados por padrão (detecção de robô),
+// então este script disfarça o navegador para se parecer com um Chrome
+// comum de um usuário real antes de acessar a página.
 
 const { chromium } = require('playwright');
 
 const URL_PAUTA = 'https://jte.csjt.jus.br/PautaDigitalPage?view=PautaDigitalPage&orgaos=12&regional=511&exibePartes=S&itensPorOrgao=10&destaque=S&exibeSala=S&alertaSonoro=S&autoRolagem=S';
 
-// tenta capturar até 2 vezes: se a página estiver lenta e a primeira
-// tentativa sair "vazia" (sem nenhuma linha da tabela carregada), tenta de
-// novo antes de desistir, em vez de publicar uma captura em branco.
-async function tentarCapturar(page, tentativa) {
-  console.log(`Tentativa ${tentativa}: abrindo a página da pauta...`);
-  await page.goto(URL_PAUTA, { waitUntil: 'networkidle', timeout: 60000 });
+const USER_AGENT_REAL = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
-  // espera a tabela (que carrega via JavaScript) terminar de desenhar
+async function tentarCapturar(context, tentativa) {
+  const page = await context.newPage();
+
+  // remove o sinalizador que denuncia automação (navigator.webdriver)
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+
+  console.log(`Tentativa ${tentativa}: abrindo a página da pauta...`);
+  const resposta = await page.goto(URL_PAUTA, { waitUntil: 'networkidle', timeout: 60000 });
+  console.log(`Status da resposta: ${resposta ? resposta.status() : 'sem resposta'}`);
+
   await page.waitForTimeout(10000);
 
-  // confere se pelo menos alguma linha de tabela apareceu na página, como
-  // sinal de que o conteúdo carregou de verdade (e não só uma tela vazia)
   const temConteudo = await page.locator('table, mat-table, tr').count();
   console.log(`Elementos de tabela encontrados: ${temConteudo}`);
 
-  return temConteudo > 0;
+  return { page, sucesso: temConteudo > 0 };
 }
 
 (async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const browser = await chromium.launch({
+    args: ['--disable-blink-features=AutomationControlled']
+  });
 
-  let sucesso = await tentarCapturar(page, 1);
+  const context = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+    userAgent: USER_AGENT_REAL,
+    locale: 'pt-BR',
+    timezoneId: 'America/Manaus'
+  });
+
+  let { page, sucesso } = await tentarCapturar(context, 1);
 
   if (!sucesso) {
     console.log('Conteúdo não detectado na primeira tentativa, tentando mais uma vez...');
-    sucesso = await tentarCapturar(page, 2);
+    await page.close();
+    ({ page, sucesso } = await tentarCapturar(context, 2));
   }
 
   console.log('Tirando a captura...');

@@ -36,6 +36,7 @@ async function tentarCapturar(page, tentativa) {
 
   // espera o cabeçalho da tabela ("Índice") aparecer de verdade na tela
   let carregou = false;
+  let temLinhas = false;
   try {
     await page.waitForFunction(() => {
       // procura, entre os elementos visíveis, algum cujo texto PRÓPRIO seja
@@ -58,10 +59,22 @@ async function tentarCapturar(page, tentativa) {
   console.log(`Tabela visível: ${carregou}`);
 
   if (carregou) {
+    // o cabeçalho da tabela aparece ANTES dos dados chegarem. Espera até 20 s
+    // por pelo menos um número de processo na tela; se não vier nenhum, a pauta
+    // pode estar mesmo vazia ("Não há registros") ou os dados ainda não carregaram.
+    try {
+      await page.waitForFunction(
+        () => /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/.test(document.body.innerText),
+        null, { timeout: 20000 });
+      temLinhas = true;
+    } catch (e) {
+      temLinhas = false;
+    }
+    console.log(`Linhas de audiência visíveis: ${temLinhas}`);
     // deixa as linhas terminarem de ser desenhadas
     await page.waitForTimeout(4000);
   }
-  return carregou;
+  return carregou && temLinhas;
 }
 
 // há quantas horas o pauta.png foi atualizado pela última vez (ou null se não der para saber)
@@ -105,6 +118,18 @@ function horasDesdeUltimaAtualizacao() {
 
   console.log('Tirando a captura...');
   await page.screenshot({ path: 'pauta.png', fullPage: true });
+
+  // registra quando a captura foi feita (horário de Manaus) para o painel
+  // poder mostrar a data real da pauta e avisar se ela estiver desatualizada.
+  const agora = new Date();
+  const fmt = (opts) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Manaus', ...opts }).format(agora);
+  const info = {
+    iso: agora.toISOString(),
+    data: fmt({ day: '2-digit', month: '2-digit', year: 'numeric' }),
+    hora: fmt({ hour: '2-digit', minute: '2-digit' }),
+    tabelaVisivel: sucesso
+  };
+  require('fs').writeFileSync('atualizado.json', JSON.stringify(info));
 
   await browser.close();
   console.log('Captura salva em pauta.png');

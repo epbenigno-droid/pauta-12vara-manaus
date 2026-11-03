@@ -2,7 +2,7 @@ name: Capturar pauta de audiências
 
 on:
   schedule:
-    - cron: '7,22,37,52 10-19 * * 1-5'
+    - cron: '4 14,16,18 * * 1-5'
   workflow_dispatch: {}
 
 jobs:

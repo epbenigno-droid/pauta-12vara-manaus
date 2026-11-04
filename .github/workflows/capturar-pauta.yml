@@ -9,23 +9,41 @@ jobs:
   capturar:
     runs-on: ubuntu-latest
     steps:
+      # Não captura depois das 14:30 (Manaus) nas execuções agendadas pelo GitHub,
+      # que às vezes chegam com horas de atraso. Disparos manuais sempre rodam.
+      - name: Verificar janela de horário
+        id: janela
+        run: |
+          HORA=$(TZ=America/Manaus date +%H%M)
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$HORA" -gt 1430 ]; then
+            echo "Agora são $HORA (Manaus), depois das 14:30. Captura ignorada."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Baixar o repositório
+        if: steps.janela.outputs.ok == 'true'
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
+        if: steps.janela.outputs.ok == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Instalar o Playwright
+        if: steps.janela.outputs.ok == 'true'
         run: |
           npm install playwright
           npx playwright install --with-deps chromium
 
       - name: Rodar a captura
+        if: steps.janela.outputs.ok == 'true'
         run: node scripts/capture.js
 
       - name: Publicar a imagem atualizada
+        if: steps.janela.outputs.ok == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
